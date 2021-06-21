@@ -11,7 +11,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from keybert.mmr import mmr
 from keybert.maxsum import max_sum_similarity
 from keybert.backend._utils import select_backend
-
+from keybert.apsyn import APSyn
 
 class KeyBERT:
     """
@@ -58,6 +58,7 @@ class KeyBERT:
                          use_mmr: bool = False,
                          diversity: float = 0.5,
                          nr_candidates: int = 20,
+                         sm : str = "cosine",
                          vectorizer: CountVectorizer = None) -> Union[List[Tuple[str, float]],
                                                                       List[List[Tuple[str, float]]]]:
         """ Extract keywords/keyphrases
@@ -111,6 +112,7 @@ class KeyBERT:
                                                      use_mmr=use_mmr,
                                                      diversity=diversity,
                                                      nr_candidates=nr_candidates,
+                                                     sm=sm,
                                                      vectorizer=vectorizer)
         elif isinstance(docs, list):
             warnings.warn("Although extracting keywords for multiple documents is faster "
@@ -133,6 +135,7 @@ class KeyBERT:
                                      use_mmr: bool = False,
                                      diversity: float = 0.5,
                                      nr_candidates: int = 20,
+                                     sm : str = "cosine",
                                      vectorizer: CountVectorizer = None) -> List[Tuple[str, float]]:
         """ Extract keywords/keyphrases for a single document
 
@@ -166,14 +169,26 @@ class KeyBERT:
             candidate_embeddings = self.model.embed(candidates)
 
             # Calculate distances and extract keywords
+            print("hallo")
             if use_mmr:
-                keywords = mmr(doc_embedding, candidate_embeddings, candidates, top_n, diversity)
+                keywords = mmr(doc_embedding, candidate_embeddings, candidates, top_n, diversity,sm)
             elif use_maxsum:
-                keywords = max_sum_similarity(doc_embedding, candidate_embeddings, candidates, top_n, nr_candidates)
+                keywords = max_sum_similarity(doc_embedding, candidate_embeddings, candidates, top_n, nr_candidates,sm)
             else:
-                distances = cosine_similarity(doc_embedding, candidate_embeddings)
-                keywords = [(candidates[index], round(float(distances[0][index]), 4))
+                if sm=="cosine":
+                   distances = cosine_similarity(doc_embedding, candidate_embeddings)
+                   keywords = [(candidates[index], round(float(distances[0][index]), 4))
                             for index in distances.argsort()[0][-top_n:]][::-1]
+                elif sm=="apsyn":
+                   doc_embedding_ref=[(1,i,doc_embedding[0][i]) for i in range(len(doc_embedding[0]))]
+                   candidate_embeddings_ref=[[(1,i,candidate_embeddings[j][i]) for i in range(len(candidate_embeddings[j]))] for j in range(len(candidate_embeddings))]
+                   distances = np.array([APSyn(doc_embedding_ref,candidate_embeddings_ref[i])[0] for i in range(len(candidate_embeddings_ref))])
+                   keywords = [(candidates[index], round(float(distances[index]), 4))
+                            for index in distances.argsort()[-top_n:]][::-1]
+                   #keywords_apsyn = [candidates[index] for index in similarities.argsort()[-top_n:]]
+
+                
+                
 
             return keywords
         except ValueError:
