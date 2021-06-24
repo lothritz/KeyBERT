@@ -169,7 +169,6 @@ class KeyBERT:
             candidate_embeddings = self.model.embed(candidates)
 
             # Calculate distances and extract keywords
-            print("hallo")
             if use_mmr:
                 keywords = mmr(doc_embedding, candidate_embeddings, candidates, top_n, diversity,sm)
             elif use_maxsum:

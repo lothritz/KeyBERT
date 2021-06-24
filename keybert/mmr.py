@@ -1,13 +1,15 @@
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Tuple
+from keybert.apsyn import APSyn
 
 
 def mmr(doc_embedding: np.ndarray,
         word_embeddings: np.ndarray,
         words: List[str],
         top_n: int = 5,
-        diversity: float = 0.8) -> List[Tuple[str, float]]:
+        diversity: float = 0.8,
+        sm:str="cosine") -> List[Tuple[str, float]]:
     """ Calculate Maximal Marginal Relevance (MMR)
     between candidate keywords and the document.
 
@@ -32,10 +34,18 @@ def mmr(doc_embedding: np.ndarray,
     """
 
     # Extract similarity within words, and between words and the document
-    word_doc_similarity = cosine_similarity(word_embeddings, doc_embedding)
-    word_similarity = cosine_similarity(word_embeddings)
+    if sm=="cosine":
+       word_doc_similarity = cosine_similarity(word_embeddings, doc_embedding)
+       word_similarity = cosine_similarity(word_embeddings)
+    elif sm=="apsyn":
+       doc_embedding_ref=[(1,i,doc_embedding[0][i]) for i in range(len(doc_embedding[0]))]
+       candidate_embeddings_ref=[[(1,i,word_embeddings[j][i]) for i in range(len(word_embeddings[j]))] for j in range(len(word_embeddings))]
+       word_doc_similarity = np.array([[x] for x in [APSyn(doc_embedding_ref,candidate_embeddings_ref[i])[0] for i in range(len(candidate_embeddings_ref))]])
+       word_similarity = np.array([np.array([APSyn(candidate_embeddings_ref[i], candidate_embeddings_ref[j])[0] for j in range(len(candidate_embeddings_ref))]) for i in range(len(candidate_embeddings_ref))])
 
     # Initialize candidates and already choose best keyword/keyphras
+    #print(len(word_doc_similarity))
+    #print(len(word_doc_similarity[0]))
     keywords_idx = [np.argmax(word_doc_similarity)]
     candidates_idx = [i for i in range(len(words)) if i != keywords_idx[0]]
 
